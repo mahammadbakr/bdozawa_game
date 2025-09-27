@@ -33,6 +33,9 @@ class ABdozawaCharacter : public ACharacter
 	
 protected:
 
+	/** Called when the game starts or when spawned */
+	virtual void BeginPlay() override;
+
 	/** Jump Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* JumpAction;
@@ -48,6 +51,10 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
+
+	/** Pickup Input Action */
+	UPROPERTY(EditAnywhere, Category="Input")
+	UInputAction* PickupAction;
 
 public:
 
@@ -84,6 +91,10 @@ public:
 	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+
+	/** Handles pickup input */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoPickup();
 
 public:
 

@@ -11,6 +11,9 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Bdozawa.h"
+#include "HideAndSeekCube.h"
+#include "CylinderPickup.h"
+#include "InputMappingContext.h"
 
 ABdozawaCharacter::ABdozawaCharacter()
 {
@@ -28,12 +31,16 @@ ABdozawaCharacter::ABdozawaCharacter()
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
 	// instead of recompiling to adjust them
-	GetCharacterMovement()->JumpZVelocity = 500.f;
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
+	GetCharacterMovement()->JumpZVelocity = 2000.f;  // 2x faster jump (was 1000)
+	GetCharacterMovement()->AirControl = 0.7f;  // Better air control for higher jumps
+	GetCharacterMovement()->MaxWalkSpeed = 3000.f;  // 3x faster walk speed (was 1000)
+	GetCharacterMovement()->MinAnalogWalkSpeed = 120.f;  // 3x minimum speed (was 40)
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
+	
+	// Additional movement improvements for faster speeds
+	GetCharacterMovement()->MaxAcceleration = 4096.f;  // Faster acceleration for quick starts
+	GetCharacterMovement()->GroundFriction = 8.0f;  // Better ground control
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -48,6 +55,30 @@ ABdozawaCharacter::ABdozawaCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+void ABdozawaCharacter::BeginPlay()
+{
+	// Call the base class  
+	Super::BeginPlay();
+
+	// Setup Enhanced Input
+	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		{
+			// Add the default mapping context
+			if (UInputMappingContext* DefaultMappingContext = LoadObject<UInputMappingContext>(nullptr, TEXT("/Game/Input/IMC_Default.IMC_Default")))
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, 0);
+				UE_LOG(LogTemp, Warning, TEXT("Added IMC_Default mapping context"));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Could not load IMC_Default mapping context"));
+			}
+		}
+	}
 }
 
 void ABdozawaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -65,6 +96,9 @@ void ABdozawaCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ABdozawaCharacter::Look);
+
+		// Pickup
+		EnhancedInputComponent->BindAction(PickupAction, ETriggerEvent::Started, this, &ABdozawaCharacter::DoPickup);
 	}
 	else
 	{
@@ -130,4 +164,74 @@ void ABdozawaCharacter::DoJumpEnd()
 {
 	// signal the character to stop jumping
 	StopJumping();
+}
+
+void ABdozawaCharacter::DoPickup()
+{
+	// Find nearby pickup objects
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("World is null in DoPickup!"));
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("E KEY PRESSED - Looking for pickup objects..."));
+
+	// Get all actors in a sphere around the player
+	TArray<AActor*> OverlappingActors;
+	GetOverlappingActors(OverlappingActors, AActor::StaticClass());
+
+	UE_LOG(LogTemp, Warning, TEXT("Found %d overlapping actors"), OverlappingActors.Num());
+
+	// Look for HideAndSeekCube objects and CylinderPickup objects
+	bool bFoundPickup = false;
+	for (AActor* Actor : OverlappingActors)
+	{
+		// Check for HideAndSeekCube
+		AHideAndSeekCube* Cube = Cast<AHideAndSeekCube>(Actor);
+		if (Cube && !Cube->IsPickedUp())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Found HideAndSeekCube! Picked up: %s"), Cube->IsPickedUp() ? TEXT("YES") : TEXT("NO"));
+			
+			// Pick up the cube
+			Cube->PickupCube();
+			bFoundPickup = true;
+			
+			// Print success message
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("🎯 Picked up cube with E key!"));
+			}
+			break; // Only pick up one object at a time
+		}
+		
+		// Check for CylinderPickup
+		ACylinderPickup* Cylinder = Cast<ACylinderPickup>(Actor);
+		if (Cylinder && !Cylinder->IsPickedUp())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Found CylinderPickup: %s! Picked up: %s"), *Cylinder->GetCylinderName(), Cylinder->IsPickedUp() ? TEXT("YES") : TEXT("NO"));
+			
+			// Pick up the cylinder
+			Cylinder->PickupCylinder();
+			bFoundPickup = true;
+			
+			// Print success message with cylinder name
+			FString PickupMessage = FString::Printf(TEXT("🎯 %s picked up with E key!"), *Cylinder->GetCylinderName());
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, PickupMessage);
+			}
+			break; // Only pick up one object at a time
+		}
+	}
+
+	if (!bFoundPickup)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No pickupable objects found nearby"));
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("❌ No objects nearby to pick up!"));
+		}
+	}
 }

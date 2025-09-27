@@ -7,6 +7,7 @@
 #include "BdozawaGameMode.generated.h"
 
 class AHideAndSeekCube;
+class ACylinderPlacementSystem;
 
 /**
  *  Simple GameMode for a third person game
@@ -24,6 +25,12 @@ public:
 protected:
 	/** Called when the game starts */
 	virtual void BeginPlay() override;
+
+	/** Called after components are initialized */
+	virtual void PostInitializeComponents() override;
+
+	/** Called when game is initialized */
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
 	/** Number of cubes to spawn */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HideAndSeek")
@@ -47,6 +54,26 @@ protected:
 	/** Array to store spawned cubes */
 	UPROPERTY(BlueprintReadOnly, Category = "HideAndSeek")
 	TArray<AHideAndSeekCube*> SpawnedCubes;
+
+	/** Array to store hidden cylinder objects */
+	UPROPERTY(BlueprintReadOnly, Category = "HideAndSeek")
+	TArray<AActor*> HiddenObjects;
+
+	/** Spawn hidden cylinder objects */
+	UFUNCTION(BlueprintCallable, Category = "HideAndSeek")
+	void SpawnHiddenObjects();
+
+	/** Cylinder placement system class */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cylinders")
+	TSubclassOf<ACylinderPlacementSystem> CylinderPlacementSystemClass;
+
+	/** Reference to the cylinder placement system */
+	UPROPERTY(BlueprintReadOnly, Category = "Cylinders")
+	ACylinderPlacementSystem* CylinderPlacementSystem;
+
+	/** Spawn cylinder placement system */
+	UFUNCTION(BlueprintCallable, Category = "Cylinders")
+	void SpawnCylinderPlacementSystem();
 };
 
 
